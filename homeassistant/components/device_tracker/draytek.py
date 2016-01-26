@@ -11,6 +11,8 @@ from collections import namedtuple
 import threading
 import requests
 import re
+import urllib
+import base64
 
 from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
 from homeassistant.util import Throttle
@@ -25,6 +27,9 @@ REQUIREMENTS = ['requests']
 Device = namedtuple("Device", ["mac", "ip", "last_update", "host"])
 
 
+def encode_login(input):
+    return urllib.parse.quote_plus(base64.b64encode(str.encode(input)))
+
 def get_scanner(hass, config):
     """ Validates config and returns a Draytek scanner.
         :param hass: Unused.
@@ -33,8 +38,8 @@ def get_scanner(hass, config):
     """
     info = config[DOMAIN]
     host = info.get(CONF_HOST)
-    username = info.get(CONF_USERNAME)
-    password = info.get(CONF_PASSWORD)
+    username = encode_login(info.get(CONF_USERNAME))
+    password = encode_login(info.get(CONF_PASSWORD))
 
     if password is not None and host is None:
         _LOGGER.warning('Found username or password but no host')
@@ -89,7 +94,6 @@ class DraytekDeviceScanner(object):
     def _update_info(self):
         """
         Retrieves latest information from the Draytek router.
-        Returns boolean if scanning successful.
         """
         if not self.success_init:
             return
@@ -98,7 +102,8 @@ class DraytekDeviceScanner(object):
             _LOGGER.info("Scanning")
 
             session = requests.Session()
-            session.get(self.cookie_url)  # set initial cookie to enable second request.
+            # set initial cookie to enable second request.
+            session.get(self.cookie_url)
             results = session.get(self.query_url).text
 
             parsed = re.findall(_REGEX, results, re.MULTILINE)
